@@ -11,9 +11,9 @@
 #
 # Commands:
 # - CLEAN   - Clean out old version of DB & Collection (if exists)
-# - INIT    - Initiatlise DB Collection with ~20k symbols & random prices
-# - LISTEN  - Continously listen for DB Collection changes and print them*
-# - UPDATES - Continously perform random updates to DB Collection*
+# - INIT    - Initialise DB Collection with ~20k symbols & random prices
+# - LISTEN  - Continuously listen for DB Collection changes and print them*
+# - UPDATES - Continuously perform random updates to DB Collection*
 #
 # *Must run 'INIT' first
 #
@@ -96,7 +96,7 @@ def do_init(*args):
 
 
 ####
-# Listen for database colletion change events and print out the change summary
+# Listen for database collection change events and print out the change summary
 #
 # Note: In a future version, if updating existing values, probably need to get
 # resume token first, before querying 'initial' values, before running watch
@@ -131,7 +131,7 @@ def do_listen(*args):
 
 
 ####
-# Loop continously, each time updating a few records and then sleeping a little
+# Loop continuously, each time updating a few records and then sleeping a little
 # Performs approximately 16 operations per second, of which only 4 operations
 # relate to updates prices to the 'important' stock symbols.
 ####
@@ -142,7 +142,7 @@ def do_updates(*args):
               'first)\n' % (DB, COLL))
         return
 
-    print('-- Continuously performing random updates on key stock sysmbols\n'
+    print('-- Continuously performing random updates on key stock symbols\n'
           '   in collection "%s.%s"\n' % (DB, COLL))
 
     try:
@@ -208,7 +208,7 @@ def rand_stock_val(symbol):
 
 
 ####
-# If the target cluster is sharded ensure, shard the database.colleciton on
+# If the target cluster is sharded ensure, shard the database.collection on
 # just the '_id' field (not usually recommended but for demos this is fine)
 ####
 def enable_collection_sharding_if_required():
