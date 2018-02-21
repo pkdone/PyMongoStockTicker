@@ -3,7 +3,7 @@
 # A Python application demonstrating MongoDB's Change Streams capability, by
 # simulating a simple "Stock Prices" system Changes to stock prices are
 # listened for and displayed to the user, as and when these price changes are
-# persisted in the MongoDB database. 
+# persisted in the MongoDB database.
 #
 # Usage (first ensure 'py' script is executable):
 #
@@ -131,9 +131,9 @@ def do_listen(*args):
 
 
 ####
-# Loop continuously, each time updating a few records and then sleeping a little
-# Performs approximately 16 operations per second, of which only 4 operations
-# relate to updates prices to the 'important' stock symbols.
+# Loop continuously, each time updating a few records and then sleeping a
+# little. Performs approximately 16 operations per second, of which only 4
+# operations relate to updates prices to the 'important' stock symbols.
 ####
 def do_updates(*args):
     if stocks_coll().find_one() is None:
