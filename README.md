@@ -35,15 +35,20 @@ The MongoDB database/collection created and used by the Python application is: '
 ![INIT](imgs/init.png)
 
 
-3. Start continuously updating records in the stock prices database collection by running the Python script with the **updates** command (abort using 'Ctrl-C'). Performs random updates on any stock in the collection and also performs some random deletes and inserts. Executes approximately 16 operations per second, of which only 4 operations relate to updating the prices of the familiar stock symbols (eg. MDB, ORCL, GOOGL). Example:
+3. Start continuously changing records in the stock prices database collection by running the Python script with the **change** command (abort using 'Ctrl-C'). Performs random updates on any stock in the collection and also performs some random deletes and inserts. Executes approximately 16 operations per second, of which only 4 operations relate to updating the prices of the familiar stock symbols (eg. MDB, ORCL, GOOGL). Example:
 
 
-![UPDATES](imgs/updates.png)
+![UPDATES](imgs/change.png)
 
 
-4. In a separate command line shell, from where the executed command is still running from point 3, start continuously listening to change events on the stock prices database collection. Run the Python script with the **listen** command to invoke this (abort using 'Ctrl-C'). This filters the database changes to only listen for updates to the prices of the familiar stock symbols records only (eg. MDB, ORCL, GOOGL), and prints out each new value as and when the change occurs. Example:
+4. In a separate command line shell, from where the executed command is still running from point 3, start continuously listening to change events on the stock prices database collection and printing the changes. Run the Python script with the **trace** command to invoke this (abort using 'Ctrl-C'). This filters the database changes to only listen for updates to the prices of the familiar stock symbols records only (eg. MDB, ORCL, GOOGL), and prints out each new value as and when the change occurs. Example:
 
 
-![LISTEN](imgs/listen.png)
+![LISTEN](imgs/trace.png)
 
+
+5. In a separate command line shell, from where the executed command is still running from point 3, start continuously listening to change events on the stock prices database collection and showing each price change inline in the console, next to its respective stock symbol. Run the Python script with the **display** command to invoke this (abort using 'Ctrl-C'). This filters the database changes to only listen for updates to the prices of the familiar stock symbols records only (eg. MDB, ORCL, GOOGL), and displays each changed value, inline, as and when the change occurs. Example:
+
+
+![LISTEN](imgs/display.png)
 

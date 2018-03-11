@@ -12,8 +12,10 @@
 # Commands:
 # - CLEAN   - Clean out old version of DB & Collection (if exists)
 # - INIT    - Initialise DB Collection with ~20k symbols & random prices
-# - LISTEN  - Continuously listen for DB Collection changes and print them*
-# - UPDATES - Continuously perform random updates to DB Collection*
+# - CHANGE  - Continuously perform random changes to records DB Collection*
+# - TRACE   - Continuously listen for DB Collection changes & print them*
+# - DISPLAY - Continuously listen for DB Collection changes & display each
+#             price change in the console, next to its respective stock symbol*
 #
 # *Must run 'INIT' first
 #
@@ -36,6 +38,8 @@ import os
 import sys
 import random
 import time
+import curses
+from curses import wrapper
 from datetime import datetime
 from pymongo import MongoClient
 
@@ -43,9 +47,9 @@ from pymongo import MongoClient
 #
 # MongoDB cluster connection URL
 #
-# Connecting to Sharded cluster's 2 mongos processes example
+# Connecting to Sharded cluster's 2 mongos processes example:
 # MONGODB_URL = 'mongodb://localhost:37300,localhost:37301/'
-# Connecting to Replica Set example
+# Connecting to Replica Set example:
 MONGODB_URL = 'mongodb://localhost:27000,localhost:27001,localhost:27002/?' \
               'replicaSet=TestRS'
 
@@ -53,7 +57,7 @@ MONGODB_URL = 'mongodb://localhost:27000,localhost:27001,localhost:27002/?' \
 ####
 # Main start function
 ####
-def do_main():
+def main():
     print(' ')
 
     if len(sys.argv) < 2:
@@ -91,75 +95,8 @@ def do_init(*args):
 
     print('\n')
 
-    for key, price in SYMBOLS.items():
+    for key in SYMBOLS.keys():
         stocks_coll().insert({'_id': key, 'price': rand_stock_val(key)})
-
-
-####
-# Listen for database collection change events and print out the change summary
-#
-# Note: In a future version, if updating existing values, probably need to get
-# resume token first, before querying 'initial' values, before running watch
-# with the explicit resume token provided.
-####
-def do_listen(*args):
-    if stocks_coll().find_one() is None:
-        print('-- Listen for changes on collection "%s.%s" aborted because\n'
-              '   collection does not exist (run with command "INIT" first)\n'
-              % (DB, COLL))
-        return
-
-    print('-- Continuously listening & displaying any updates that occur on\n'
-          '   key stock symbols in collection "%s.%s"\n' % (DB, COLL))
-
-    cursor = stocks_coll().watch([
-        {'$match': {
-            'operationType': 'update',
-            'updateDescription.updatedFields.price': {'$exists': True},
-            'documentKey._id': {'$in': list(SYMBOLS.keys())},
-        }}
-    ])
-
-    try:
-        for doc in cursor:
-            print('Stock %s \ttick: %d \t time:%s' % (
-                  doc['documentKey']['_id'],
-                  doc['updateDescription']['updatedFields']['price'],
-                  str(datetime.now().strftime('%H:%M:%S.%f')[:-2])))
-    except KeyboardInterrupt:
-        keyboard_shutdown()
-
-
-####
-# Loop continuously, each time updating a few records and then sleeping a
-# little. Performs approximately 16 operations per second, of which only 4
-# operations relate to updates prices to the 'important' stock symbols.
-####
-def do_updates(*args):
-    if stocks_coll().find_one() is None:
-        print('-- Performing random updates to collection "%s.%s" aborted\n'
-              '   because collection does not exist (run with command "INIT" '
-              'first)\n' % (DB, COLL))
-        return
-
-    print('-- Continuously performing random updates on key stock symbols\n'
-          '   in collection "%s.%s"\n' % (DB, COLL))
-
-    try:
-        while True:
-            key = random.choice(SYMBOLS.keys())
-            stocks_coll().update_one({'_id': key},
-                                     {'$set': {'price': rand_stock_val(key)}})
-            key = random.randrange(10000, 15000)
-            stocks_coll().update_one({'_id': key},
-                                     {'$set': {'price': rand_stock_val(key)}})
-            key = random.randrange(10000, 15000)
-            stocks_coll().delete_one({'_id': 'K%d' % key})
-            stocks_coll().insert({'_id': 'K%d' % key,
-                                  'price': rand_stock_val(key)})
-            time.sleep(0.25)
-    except KeyboardInterrupt:
-        keyboard_shutdown()
 
 
 ####
@@ -172,23 +109,162 @@ def do_clean(*args):
 
 
 ####
-# Print out how to use this script
+# Loop continuously, each time updating a few records and then sleeping a
+# little. Performs approximately 16 operations per second, of which only 4
+# operations relate to updating prices of the 'important' stock symbols.
 ####
-def print_usage():
-    print('\nUsage:')
-    print('\n $ ./mongo_stock_ticker.py <COMMAND>')
-    print('\n Command options:')
+def do_change(*args):
+    if stocks_coll().find_one() is None:
+        print('-- Performing random updates to collection "%s.%s" aborted\n'
+              '   because collection does not exist (run with command "INIT" '
+              'first)\n' % (DB, COLL))
+        return
 
-    for key, price in COMMANDS.items():
-        print(' * %s' % key)
+    print('-- Continuously performing random updates on key stock symbols\n'
+          '   in collection "%s.%s"\n' % (DB, COLL))
+
+    try:
+        while True:
+            key = random.choice(SYMBOLS.keys())
+            # Update random important stock symbol's price
+            stocks_coll().update_one({'_id': key},
+                                     {'$set': {'price': rand_stock_val(key)}})
+            key = random.randrange(10000, 15000)
+            # Update random arbitrary stock symbol's price
+            stocks_coll().update_one({'_id': 'S%d' % key},
+                                     {'$set': {'price': rand_stock_val(key)}})
+            key = random.randrange(10000, 15000)
+            # Delete random stock symbol
+            stocks_coll().delete_one({'_id': 'K%d' % key})
+            # Insert deleted stock symbol back in
+            stocks_coll().insert({'_id': 'K%d' % key,
+                                  'price': rand_stock_val(key)})
+            time.sleep(0.25)
+    except KeyboardInterrupt:
+        keyboard_shutdown()
 
 
 ####
-# Print script startup error reason
+# Listen for database collection change events and print out the changes as
+# they occur
 ####
-def print_commands_error(command):
-    print('Error: Illegal command argument provided: "%s"' % command)
-    print_usage()
+def do_trace(*args):
+    if stocks_coll().find_one() is None:
+        print('-- Listen for changes on collection "%s.%s" aborted because\n'
+              '   collection does not exist (run with command "INIT" first)\n'
+              % (DB, COLL))
+        return
+
+    print('-- Continuously listening & displaying any updates that occur on\n'
+          '   key stock symbols in collection "%s.%s"\n' % (DB, COLL))
+
+    cursor = stocks_coll().watch(get_stock_watch_filter())
+
+    try:
+        for doc in cursor:
+            print('Stock %s \ttick: %d \t time:%s' % (
+                  doc['documentKey']['_id'],
+                  doc['updateDescription']['updatedFields']['price'],
+                  str(datetime.now().strftime('%H:%M:%S.%f')[:-2])))
+    except KeyboardInterrupt:
+        keyboard_shutdown()
+
+
+####
+# Continuously listen for database collection change events and display each
+# price change inline in the console, next to its respective stock symbol
+####
+def do_display(*args):
+    if stocks_coll().find_one() is None:
+        print('-- Display changes for collection "%s.%s" aborted because\n'
+              '   collection does not exist (run with command "INIT" first)\n'
+              % (DB, COLL))
+        return
+
+    try:
+        wrapper(show_console_ui)
+    except KeyboardInterrupt:
+        keyboard_shutdown()
+
+
+####
+# Show the Console 'ncurses' UI with stock prices constantly changing inline
+####
+def show_console_ui(stdscr):
+    init_console_ui(stdscr)
+    symbols_list = SYMBOLS.keys()
+    now = datetime.now()
+    last_updated_tracker = {}
+    (last_price_tracker, resume_token) = get_init_stck_vals_plus_resume_tkn()
+
+    for symbol in symbols_list:
+        last_updated_tracker[symbol] = now
+
+    for symbol in symbols_list:
+        stdscr.addstr(symbols_list.index(symbol), 0, symbol)
+        stdscr.addstr(symbols_list.index(symbol), 6, ':')
+        stdscr.addstr(symbols_list.index(symbol), 8,
+                      str(last_price_tracker[symbol]))
+
+    stdscr.addstr(len(symbols_list)+1, 0, '(press "Ctrl-C" to quit)')
+    refresh_console_ui(stdscr, symbols_list)
+    cursor = stocks_coll().watch(get_stock_watch_filter(),
+                                 resume_after=resume_token)
+
+    for doc in cursor:
+        changed_symbol = doc['documentKey']['_id']
+        price = doc['updateDescription']['updatedFields']['price']
+        now = datetime.now()
+        last_updated_tracker[changed_symbol] = now
+        last_price_tracker[changed_symbol] = price
+
+        for symbol in symbols_list:
+            if (now - last_updated_tracker[symbol]).total_seconds() < 1:
+                stdscr.addstr(symbols_list.index(symbol), 8,
+                              str(last_price_tracker[symbol]),
+                              curses.A_REVERSE)
+            else:
+                stdscr.addstr(symbols_list.index(symbol), 8,
+                              str(last_price_tracker[symbol]))
+
+        refresh_console_ui(stdscr, symbols_list)
+
+
+####
+# Get a resume token for the first change received, then query the values for
+# all important stock symbols, returning both pieces of data
+####
+def get_init_stck_vals_plus_resume_tkn():
+    print('\n**Waiting for just one change event on collection "%s.%s", to '
+          'obtain a resume token, before being able to track & show changes**'
+          % (DB, COLL))
+
+    cursor = stocks_coll().watch()
+    doc = next(cursor)  # waits indefinitely if no subsequent changes are made
+    resume_token = doc.get("_id")
+    last_price_tracker = {}
+    cursor = stocks_coll().find({'_id': {'$in': list(SYMBOLS.keys())}})
+
+    for doc in cursor:
+        last_price_tracker[doc['_id']] = doc['price']
+
+    return (last_price_tracker, resume_token)
+
+
+####
+# Clear the UI ready to show changing data
+####
+def init_console_ui(stdscr):
+    stdscr.nodelay(True)
+    stdscr.clear()
+
+
+####
+# Show any display changes that have occurred, in the UI
+####
+def refresh_console_ui(stdscr, symbols_list):
+    stdscr.addstr(len(symbols_list)+2, 0, '')
+    stdscr.refresh()
 
 
 ####
@@ -196,15 +272,6 @@ def print_commands_error(command):
 ####
 def stocks_coll():
     return MongoClient(MONGODB_URL)[DB][COLL]
-
-
-####
-# Return random integer value for a stock symbol between 20 & 89, unless
-# symbol is for MongoDB, in which case return random value between 90 & 99
-####
-def rand_stock_val(symbol):
-    return (random.randrange(90, 100) if (symbol == 'MDB')
-            else random.randrange(20, 90))
 
 
 ####
@@ -221,11 +288,56 @@ def enable_collection_sharding_if_required():
 
 
 ####
+# Return the aggregation filter to be used to watch important stock symbol
+# price changes
+####
+def get_stock_watch_filter():
+    return [
+        {'$match': {
+            'operationType': 'update',
+            'updateDescription.updatedFields.price': {'$exists': True},
+            'documentKey._id': {'$in': list(SYMBOLS.keys())},
+        }}
+    ]
+
+
+####
+# Return random integer value for a stock symbol between 20 & 89, unless
+# symbol is for MongoDB, in which case return random value between 90 & 99
+####
+def rand_stock_val(symbol):
+    return (random.randrange(90, 100) if (symbol == 'MDB')
+            else random.randrange(20, 90))
+
+
+####
+# Print out how to use this script
+####
+def print_usage():
+    print('\nUsage:')
+    print('\n $ ./mongo_stock_ticker.py <COMMAND>')
+    print('\n Command options:')
+
+    for key in COMMANDS.keys():
+        print(' * %s' % key)
+
+    print
+
+
+####
+# Print script start-up error reason
+####
+def print_commands_error(command):
+    print('Error: Illegal command argument provided: "%s"' % command)
+    print_usage()
+
+
+####
 # Swallow the verbiage that is spat out when using 'Ctrl-C' to kill the script
 # and instead just print a simple single line message
 ####
 def keyboard_shutdown():
-    print('\nInterrupted\n')
+    print('\Interrupted\n')
 
     try:
         sys.exit(0)
@@ -251,11 +363,11 @@ SYMBOLS = {
     'GOOGL': 'Alphabet Inc.',
     'FB':    'Facebook, Inc.',
 }
-
 COMMANDS = {
     'INIT':    do_init,
-    'LISTEN':  do_listen,
-    'UPDATES': do_updates,
+    'TRACE':  do_trace,
+    'DISPLAY': do_display,
+    'CHANGE': do_change,
     'CLEAN':   do_clean,
 }
 
@@ -264,4 +376,4 @@ COMMANDS = {
 # Main
 ####
 if __name__ == '__main__':
-    do_main()
+    main()
