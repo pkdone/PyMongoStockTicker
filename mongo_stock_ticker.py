@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 ##
 # A Python application demonstrating MongoDB's Change Streams capability, by
-# simulating a simple "Stock Prices" system Changes to stock prices are
+# simulating a simple "Stock Prices" system. Changes to stock prices are
 # listened for and displayed to the user, as and when these price changes are
 # persisted in the MongoDB database.
 #
