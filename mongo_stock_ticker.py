@@ -208,7 +208,7 @@ def show_console_ui(stdscr):
                       str(last_price_tracker[symbol]))
 
     stdscr.addstr(len(symbols_list)+1, 0, '(press "Ctrl-C" to quit)')
-    refresh_console_ui(stdscr, symbols_list)
+    refresh_console_ui(stdscr, len(symbols_list)+2)
     cursor = stocks_coll().watch(get_stock_watch_filter(),
                                  resume_after=resume_token)
 
@@ -228,7 +228,7 @@ def show_console_ui(stdscr):
                 stdscr.addstr(symbols_list.index(symbol), 8,
                               str(last_price_tracker[symbol]))
 
-        refresh_console_ui(stdscr, symbols_list)
+        refresh_console_ui(stdscr, len(symbols_list)+2)
 
 
 ####
@@ -263,8 +263,8 @@ def init_console_ui(stdscr):
 ####
 # Show any display changes that have occurred, in the UI
 ####
-def refresh_console_ui(stdscr, symbols_list):
-    stdscr.addstr(len(symbols_list)+2, 0, '')
+def refresh_console_ui(stdscr, row_pos):
+    stdscr.addstr(row_pos, 0, '')
     stdscr.refresh()
 
 
