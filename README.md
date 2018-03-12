@@ -52,8 +52,6 @@ The MongoDB database/collection created and used by the Python application is: '
 
 ![LISTEN](imgs/display.png)
 
-
-
 ## FAQ
 
 * Q1. In this example application, why isn't the resume token saved somewhere by the client application listening process, so that if the client process crashes, the client could restart from where it left off?
