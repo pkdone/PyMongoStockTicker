@@ -12,7 +12,7 @@
 # Commands:
 # - CLEAN   - Clean out old version of DB & Collection (if exists)
 # - INIT    - Initialise DB Collection with ~20k symbols & random prices
-# - CHANGE  - Continuously perform random changes to records DB Collection*
+# - CHANGE  - Continuously perform random changes to records in DB Collection*
 # - TRACE   - Continuously listen for DB Collection changes & print them*
 # - DISPLAY - Continuously listen for DB Collection changes & display each
 #             price change in the console, next to its respective stock symbol*
@@ -163,7 +163,7 @@ def do_trace(*args):
 
     try:
         for doc in cursor:
-            print('Stock %s \ttick: %d \t time:%s' % (
+            print('Stock %s \ttick: %d \t time: %s' % (
                   doc['documentKey']['_id'],
                   doc['updateDescription']['updatedFields']['price'],
                   str(datetime.now().strftime('%H:%M:%S.%f')[:-2])))
