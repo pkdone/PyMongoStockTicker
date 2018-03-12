@@ -8,7 +8,7 @@ The MongoDB database/collection created and used by the Python application is: '
 
 1. A MongoDB deployment is already configured, running and accessible. The version of MongoDB must be 3.6 or greater. The deployment can be either a MongoDB Replica Set (see [example](https://github.com/pkdone/mongo-quick-repset) of how to quickly run one on the same local machine) or a Sharded Cluster (see [example](https://github.com/pkdone/mongo-multi-svr-generator) of how to quickly run one on the same local machine). **Note:** A standalone non-replicated MongoDB deployment cannot be used, as this is not supported by the Change Streams capability.
 
-2. The MongoDB Python Driver (PyMongo) is already installed locally (must be PyMongoo version 3.6 or greater). Example:
+2. The MongoDB Python Driver (PyMongo) is already installed locally (must be PyMongo version 3.6 or greater). Example:
 
     ```
     $ sudo pip install pymongo

@@ -23,12 +23,12 @@
 #
 # Prerequisites:
 #
-# 1) Configure and run one of the following:
+# 1) Configure and run one of following using MongoDB version 3.6+:
 # * MongoDB Replica Set (e.g. https://github.com/pkdone/mongo-quick-repset)
 #  or
 # * Sharded Cluster (e.g. https://github.com/pkdone/mongo-multi-svr-generator)
 #
-# 2) Install PyMongo driver, eg:
+# 2) Install PyMongo driver (version 3.6+), eg:
 #   $ sudo pip install pymongo
 #
 # 3) Change the value of the MONGODB_URL variable, below, to reflect cluster
