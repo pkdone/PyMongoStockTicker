@@ -39,6 +39,7 @@ import sys
 import random
 import time
 import curses
+from pprint import pprint
 from curses import wrapper
 from datetime import datetime
 from pymongo import MongoClient
@@ -275,8 +276,8 @@ def stocks_coll():
 
 
 ####
-# If the target cluster is sharded ensure, shard the database.collection on
-# just the '_id' field (not usually recommended but for demos this is fine)
+# If the target cluster is sharded, shard the database.collection on just the
+# '_id' field (not usually recommended but for demos this is fine)
 ####
 def enable_collection_sharding_if_required():
     admin_db = MongoClient(MONGODB_URL).admin
@@ -337,7 +338,7 @@ def print_commands_error(command):
 # and instead just print a simple single line message
 ####
 def keyboard_shutdown():
-    print('\Interrupted\n')
+    print('Interrupted\n')
 
     try:
         sys.exit(0)
@@ -365,9 +366,9 @@ SYMBOLS = {
 }
 COMMANDS = {
     'INIT':    do_init,
-    'TRACE':  do_trace,
+    'TRACE':   do_trace,
     'DISPLAY': do_display,
-    'CHANGE': do_change,
+    'CHANGE':  do_change,
     'CLEAN':   do_clean,
 }
 
