@@ -263,8 +263,8 @@ def init_console_ui(stdscr):
 ####
 # Show any display changes that have occurred, in the UI
 ####
-def refresh_console_ui(stdscr, row_pos):
-    stdscr.addstr(row_pos, 0, '')
+def refresh_console_ui(stdscr, cursor_row_pos):
+    stdscr.addstr(cursor_row_pos, 0, '')
     stdscr.refresh()
 
 
