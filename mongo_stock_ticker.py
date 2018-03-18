@@ -322,7 +322,7 @@ def print_usage():
     for key in COMMANDS.keys():
         print(' * %s' % key)
 
-    print
+    print(' ')
 
 
 ####
