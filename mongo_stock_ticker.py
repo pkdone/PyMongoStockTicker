@@ -51,8 +51,10 @@ from pymongo import MongoClient
 # Connecting to Sharded cluster's 2 mongos processes example:
 # MONGODB_URL = 'mongodb://localhost:37300,localhost:37301/'
 # Connecting to Replica Set example:
-MONGODB_URL = 'mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=myrs' 
-mClient = MongoClient(MONGODB_URL)
+MONGODB_URL = 'mongodb://localhost:27000,localhost:27001,localhost:27002/?' \
+              'replicaSet=TestRS'
+mongo_client = MongoClient(MONGODB_URL)
+
 
 ####
 # Main start function
@@ -79,8 +81,8 @@ def do_init(*args):
         return
 
     enable_collection_sharding_if_required()
-    print('-- Initialising collection "%s.%s" with stock price values (this\n'
-          '   will take a few minutes)\n' % (DB, COLL))
+    print('-- Initialising collection "%s.%s" with stock price values\n'
+          % (DB, COLL))
 
     for i in xrange(10000, 15000):
         price = random.randrange(10, 20)
@@ -105,7 +107,7 @@ def do_init(*args):
 def do_clean(*args):
     print('-- Dropping collection "%s.%s" and all its documents\n'
           % (DB, COLL))
-    mClient.drop_database(DB)
+    mongo_client.drop_database(DB)
 
 
 ####
@@ -271,7 +273,7 @@ def refresh_console_ui(stdscr, cursor_row_pos):
 # Get handle on database.collection
 ####
 def stocks_coll():
-    return mClient[DB][COLL]
+    return mongo_client[DB][COLL]
 
 
 ####
@@ -279,7 +281,7 @@ def stocks_coll():
 # '_id' field (not usually recommended but for demos this is fine)
 ####
 def enable_collection_sharding_if_required():
-    admin_db = mClient.admin
+    admin_db = mongo_client.admin
 
     if admin_db.command('serverStatus')['process'] == 'mongos':
         admin_db.command('enableSharding', DB)
