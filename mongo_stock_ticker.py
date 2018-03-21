@@ -51,8 +51,7 @@ from pymongo import MongoClient
 # Connecting to Sharded cluster's 2 mongos processes example:
 # MONGODB_URL = 'mongodb://localhost:37300,localhost:37301/'
 # Connecting to Replica Set example:
-MONGODB_URL = 'mongodb://localhost:27017' \
-#MONGODB_URL = 'mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=myrs' 
+MONGODB_URL = 'mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=myrs' 
 mClient = MongoClient(MONGODB_URL)
 
 ####
