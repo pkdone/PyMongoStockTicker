@@ -51,9 +51,9 @@ from pymongo import MongoClient
 # Connecting to Sharded cluster's 2 mongos processes example:
 # MONGODB_URL = 'mongodb://localhost:37300,localhost:37301/'
 # Connecting to Replica Set example:
-MONGODB_URL = 'mongodb://localhost:27000,localhost:27001,localhost:27002/?' \
-              'replicaSet=TestRS'
-
+MONGODB_URL = 'mongodb://localhost:27017' \
+#MONGODB_URL = 'mongodb://localhost:27017,localhost:27018,localhost:27019/?replicaSet=myrs' 
+mClient = MongoClient(MONGODB_URL)
 
 ####
 # Main start function
@@ -106,7 +106,7 @@ def do_init(*args):
 def do_clean(*args):
     print('-- Dropping collection "%s.%s" and all its documents\n'
           % (DB, COLL))
-    MongoClient(MONGODB_URL).drop_database(DB)
+    mClient.drop_database(DB)
 
 
 ####
@@ -272,7 +272,7 @@ def refresh_console_ui(stdscr, cursor_row_pos):
 # Get handle on database.collection
 ####
 def stocks_coll():
-    return MongoClient(MONGODB_URL)[DB][COLL]
+    return mClient[DB][COLL]
 
 
 ####
@@ -280,7 +280,7 @@ def stocks_coll():
 # '_id' field (not usually recommended but for demos this is fine)
 ####
 def enable_collection_sharding_if_required():
-    admin_db = MongoClient(MONGODB_URL).admin
+    admin_db = mClient.admin
 
     if admin_db.command('serverStatus')['process'] == 'mongos':
         admin_db.command('enableSharding', DB)
