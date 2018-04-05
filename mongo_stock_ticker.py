@@ -10,16 +10,21 @@
 #   $ ./mongo_stock_ticker.py <COMMAND>
 #
 # Commands:
-# - CLEAN   - Clean out old version of DB & Collection (if exists)
-# - INIT    - Initialise DB Collection with ~20k symbols & random prices
-# - CHANGE  - Continuously perform random changes to records in DB Collection*
-# - TRACE   - Continuously listen for DB Collection changes & print them*
-# - DISPLAY - Continuously listen for DB Collection changes & display each
-#             price change in the console, next to its respective stock symbol*
+# - CLEAN    - Clean out old version of DB & Collection (if exists)
+# - INIT     - Initialise DB Collection with many symbols & random prices
+# - CHANGE   - Continuously perform random changes to records in DB Collection*
+# - TRACE    - Continuously listen for DB Collection changes & print them*
+# - DISPLAY  - Continuously listen for DB Collection changes & display each
+#              price change in the console next to its respective stock symbol*
 #
 # *Must run 'INIT' first
 #
 # The MongoDB database/collection created & used is 'market.stocksymbols'
+#
+# If the target cluster is a non-sharded deployment, INIT inserts about 20k
+# records which takes about 10 seconds. If the target cluster is sharded, INIT
+# inserts about 8m records, to properly test the sharded cluster, which takes
+# around 1 hour to complete.
 #
 # Prerequisites:
 #
@@ -71,7 +76,7 @@ def main():
 
 
 ####
-# Initialise MongoDB database collection with records
+# Initialise MongoDB database collection with a set of records
 ####
 def do_init(*args):
     if stocks_coll().find_one() is not None:
@@ -80,18 +85,25 @@ def do_init(*args):
               % (DB, COLL))
         return
 
-    enable_collection_sharding_if_required()
+    sharded = enable_collection_sharding_if_required()
     print('-- Initialising collection "%s.%s" with stock price values\n'
           % (DB, COLL))
 
-    for i in xrange(10000, 15000):
+    if sharded:
+        print('   WARNING: Sharded cluster, so loading a large amount of'
+              ' data that may take\n            about 1 hour to complete\n')
+        show_progress_dot_gap = 500
+    else:
+        show_progress_dot_gap = 100
+
+    for i in xrange(rand_key_range(sharded)[0], rand_key_range(sharded)[1]):
         price = random.randrange(10, 20)
         stocks_coll().insert({'_id': 'A%d' % i, 'price': price})
         stocks_coll().insert({'_id': 'K%d' % i, 'price': price})
         stocks_coll().insert({'_id': 'S%d' % i, 'price': price})
         stocks_coll().insert({'_id': 'Z%d' % i, 'price': price})
 
-        if (i % 50) == 0:
+        if (i % show_progress_dot_gap) == 0:
                 sys.stdout.write('.')
                 sys.stdout.flush()
 
@@ -125,21 +137,25 @@ def do_change(*args):
     print('-- Continuously performing random updates on key stock symbols\n'
           '   in collection "%s.%s"\n' % (DB, COLL))
 
+    sharded = is_deployment_sharded()
+
     try:
         while True:
             key = random.choice(SYMBOLS.keys())
             # Update random important stock symbol's price
             stocks_coll().update_one({'_id': key},
                                      {'$set': {'price': rand_stock_val(key)}})
-            key = random.randrange(10000, 15000)
+            key = random.randrange(rand_key_range(sharded)[0],
+                                   rand_key_range(sharded)[1])
             # Update random arbitrary stock symbol's price
-            stocks_coll().update_one({'_id': 'S%d' % key},
+            stocks_coll().update_one({'_id': 'A%d' % key},
                                      {'$set': {'price': rand_stock_val(key)}})
-            key = random.randrange(10000, 15000)
+            key = random.randrange(rand_key_range(sharded)[0],
+                                   rand_key_range(sharded)[1])
             # Delete random stock symbol
-            stocks_coll().delete_one({'_id': 'K%d' % key})
+            stocks_coll().delete_one({'_id': 'Z%d' % key})
             # Insert deleted stock symbol back in
-            stocks_coll().insert({'_id': 'K%d' % key,
+            stocks_coll().insert({'_id': 'Z%d' % key,
                                   'price': rand_stock_val(key)})
             time.sleep(0.25)
     except KeyboardInterrupt:
@@ -277,16 +293,33 @@ def stocks_coll():
 
 
 ####
+# Sees if the target deployment is sharded or not
+####
+def is_deployment_sharded():
+    is_sharded = False
+    admin_db = mongo_client.admin
+
+    if admin_db.command('serverStatus')['process'] == 'mongos':
+        is_sharded = True
+
+    return is_sharded
+
+
+####
 # If the target cluster is sharded, shard the database.collection on just the
 # '_id' field (not usually recommended but for demos this is fine)
 ####
 def enable_collection_sharding_if_required():
+    is_sharded = False
     admin_db = mongo_client.admin
 
     if admin_db.command('serverStatus')['process'] == 'mongos':
+        is_sharded = True
         admin_db.command('enableSharding', DB)
         admin_db.command('shardCollection', '%s.%s' % (DB, COLL),
                          key={'_id': 1})
+
+    return is_sharded
 
 
 ####
@@ -310,6 +343,18 @@ def get_stock_watch_filter():
 def rand_stock_val(symbol):
     return (random.randrange(90, 100) if (symbol == 'MDB')
             else random.randrange(20, 90))
+
+
+####
+# Returns of the range of record key values that should be created / changed,
+# which is just a few thousand for non-sharded deployments and a few million
+# for sharded deployments
+####
+def rand_key_range(sharded):
+    if sharded:
+        return (BIG_RANDKEY_RANGE_LOWER, BIG_RANDKEY_RANGE_UPPER)
+    else:
+        return (SMALL_RANDKEY_RANGE_LOWER, SMALL_RANDKEY_RANGE_UPPER)
 
 
 ####
@@ -350,6 +395,10 @@ def keyboard_shutdown():
 # Constants
 DB = 'market'
 COLL = 'stocksymbols'
+SMALL_RANDKEY_RANGE_LOWER = 10000
+SMALL_RANDKEY_RANGE_UPPER = 15000
+BIG_RANDKEY_RANGE_LOWER = 1000000
+BIG_RANDKEY_RANGE_UPPER = 1999999
 SYMBOLS = {
     'MDB':   'MongoDB Inc.',
     'MULE':  'MuleSoft Inc.',
@@ -366,11 +415,11 @@ SYMBOLS = {
     'FB':    'Facebook, Inc.',
 }
 COMMANDS = {
-    'INIT':    do_init,
-    'TRACE':   do_trace,
-    'DISPLAY': do_display,
-    'CHANGE':  do_change,
-    'CLEAN':   do_clean,
+    'CLEAN':    do_clean,
+    'INIT':     do_init,
+    'CHANGE':   do_change,
+    'TRACE':    do_trace,
+    'DISPLAY':  do_display,
 }
 
 
