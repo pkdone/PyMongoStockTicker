@@ -11,7 +11,7 @@
 #
 # Commands:
 # - CLEAN    - Clean out old version of DB & Collection (if exists)
-# - INIT     - Initialise DB Collection with many symbols & random prices
+# - INIT     - Initialise DB Collection with ~20k symbols & random prices
 # - CHANGE   - Continuously perform random changes to records in DB Collection*
 # - TRACE    - Continuously listen for DB Collection changes & print them*
 # - DISPLAY  - Continuously listen for DB Collection changes & display each
@@ -20,11 +20,6 @@
 # *Must run 'INIT' first
 #
 # The MongoDB database/collection created & used is 'market.stocksymbols'
-#
-# If the target cluster is a non-sharded deployment, INIT inserts about 20k
-# records which takes about 10 seconds. If the target cluster is sharded, INIT
-# inserts about 8m records, to properly test the sharded cluster, which takes
-# around 1 hour to complete.
 #
 # Prerequisites:
 #
@@ -47,6 +42,7 @@ import curses
 from pprint import pprint
 from curses import wrapper
 from datetime import datetime
+from string import ascii_uppercase
 from pymongo import MongoClient
 
 
@@ -65,7 +61,7 @@ mongo_client = MongoClient(MONGODB_URL)
 # Main start function
 ####
 def main():
-    print(' ')
+    print('')
 
     if len(sys.argv) < 2:
         print('Error: No command argument provided')
@@ -85,25 +81,19 @@ def do_init(*args):
               % (DB, COLL))
         return
 
-    sharded = enable_collection_sharding_if_required()
     print('-- Initialising collection "%s.%s" with stock price values\n'
           % (DB, COLL))
 
-    if sharded:
-        print('   WARNING: Sharded cluster, so loading a large amount of'
-              ' data that may take\n            about 1 hour to complete\n')
-        show_progress_dot_gap = 500
-    else:
-        show_progress_dot_gap = 100
+    enable_collection_sharding_if_required()
 
-    for i in xrange(rand_key_range(sharded)[0], rand_key_range(sharded)[1]):
+    for i in xrange(RANDKEY_LOWER, RANDKEY_UPPER):
         price = random.randrange(10, 20)
         stocks_coll().insert({'_id': 'A%d' % i, 'price': price})
         stocks_coll().insert({'_id': 'K%d' % i, 'price': price})
         stocks_coll().insert({'_id': 'S%d' % i, 'price': price})
         stocks_coll().insert({'_id': 'Z%d' % i, 'price': price})
 
-        if (i % show_progress_dot_gap) == 0:
+        if (i % 100) == 0:
                 sys.stdout.write('.')
                 sys.stdout.flush()
 
@@ -137,21 +127,17 @@ def do_change(*args):
     print('-- Continuously performing random updates on key stock symbols\n'
           '   in collection "%s.%s"\n' % (DB, COLL))
 
-    sharded = is_deployment_sharded()
-
     try:
         while True:
             key = random.choice(SYMBOLS.keys())
             # Update random important stock symbol's price
             stocks_coll().update_one({'_id': key},
                                      {'$set': {'price': rand_stock_val(key)}})
-            key = random.randrange(rand_key_range(sharded)[0],
-                                   rand_key_range(sharded)[1])
+            key = random.randrange(RANDKEY_LOWER, RANDKEY_UPPER)
             # Update random arbitrary stock symbol's price
             stocks_coll().update_one({'_id': 'A%d' % key},
                                      {'$set': {'price': rand_stock_val(key)}})
-            key = random.randrange(rand_key_range(sharded)[0],
-                                   rand_key_range(sharded)[1])
+            key = random.randrange(RANDKEY_LOWER, RANDKEY_UPPER)
             # Delete random stock symbol
             stocks_coll().delete_one({'_id': 'Z%d' % key})
             # Insert deleted stock symbol back in
@@ -213,7 +199,7 @@ def show_console_ui(stdscr):
     symbols_list = SYMBOLS.keys()
     now = datetime.now()
     last_updated_tracker = {}
-    (last_price_tracker, resume_token) = get_init_stck_vals_plus_resume_tkn()
+    (last_price_tracker, resume_token) = get_init_stock_vals_plus_resume_tkn()
 
     for symbol in symbols_list:
         last_updated_tracker[symbol] = now
@@ -252,7 +238,7 @@ def show_console_ui(stdscr):
 # Get a resume token for the first change received, then query the values for
 # all important stock symbols, returning both pieces of data
 ####
-def get_init_stck_vals_plus_resume_tkn():
+def get_init_stock_vals_plus_resume_tkn():
     print('\n**Waiting for just one change event on collection "%s.%s", to '
           'obtain a resume token, before being able to track & show changes**'
           % (DB, COLL))
@@ -293,33 +279,41 @@ def stocks_coll():
 
 
 ####
-# Sees if the target deployment is sharded or not
-####
-def is_deployment_sharded():
-    is_sharded = False
-    admin_db = mongo_client.admin
-
-    if admin_db.command('serverStatus')['process'] == 'mongos':
-        is_sharded = True
-
-    return is_sharded
-
-
-####
 # If the target cluster is sharded, shard the database.collection on just the
-# '_id' field (not usually recommended but for demos this is fine)
+# '_id' field (not usually recommended but for demos this is fine). Also, pre-
+# split the collection's chunks to ensure added records are spread accross both
+# shards from day 1, to avoid Changes Streams issues with sharded clusters
+# w.r.t.: (i) no resume token errors, and (ii) gaps of 10 second between sets
+# of change events.
 ####
 def enable_collection_sharding_if_required():
-    is_sharded = False
     admin_db = mongo_client.admin
 
     if admin_db.command('serverStatus')['process'] == 'mongos':
-        is_sharded = True
         admin_db.command('enableSharding', DB)
         admin_db.command('shardCollection', '%s.%s' % (DB, COLL),
                          key={'_id': 1})
 
-    return is_sharded
+        # Create temp docs from A-Z to help with subsequent splitting chunks
+        for c in ascii_uppercase:
+            stocks_coll().insert({'_id': '%s%s%s%s%s' % (c, c, c, c, c),
+                                  'price': 0})
+
+        # Split chunks at various intervals (would use 'middle' rather than
+        # 'find' but PyMongo doesn't allow this admin command to be invoked)
+        for c in ['B', 'C', 'D', 'E', 'F', 'K', 'T', 'U', 'V', 'X', 'Y']:
+            admin_db.command({'split': '%s.%s' % (DB, COLL),
+                              'find': {'_id': '%s' % c}})
+
+        # Wait 15 seconds to allow the balancer to split chunks accross shards
+        for i in xrange(0, 30):
+                sys.stdout.write('.')
+                sys.stdout.flush()
+                time.sleep(0.5)
+
+        # Remove tem docs from A-Z as now longer needed
+        for c in ascii_uppercase:
+            stocks_coll().remove({'_id': '%s%s%s%s%s' % (c, c, c, c, c)})
 
 
 ####
@@ -343,18 +337,6 @@ def get_stock_watch_filter():
 def rand_stock_val(symbol):
     return (random.randrange(90, 100) if (symbol == 'MDB')
             else random.randrange(20, 90))
-
-
-####
-# Returns of the range of record key values that should be created / changed,
-# which is just a few thousand for non-sharded deployments and a few million
-# for sharded deployments
-####
-def rand_key_range(sharded):
-    if sharded:
-        return (BIG_RANDKEY_RANGE_LOWER, BIG_RANDKEY_RANGE_UPPER)
-    else:
-        return (SMALL_RANDKEY_RANGE_LOWER, SMALL_RANDKEY_RANGE_UPPER)
 
 
 ####
@@ -395,10 +377,8 @@ def keyboard_shutdown():
 # Constants
 DB = 'market'
 COLL = 'stocksymbols'
-SMALL_RANDKEY_RANGE_LOWER = 10000
-SMALL_RANDKEY_RANGE_UPPER = 15000
-BIG_RANDKEY_RANGE_LOWER = 1000000
-BIG_RANDKEY_RANGE_UPPER = 1999999
+RANDKEY_LOWER = 10000
+RANDKEY_UPPER = 15000
 SYMBOLS = {
     'MDB':   'MongoDB Inc.',
     'MULE':  'MuleSoft Inc.',
