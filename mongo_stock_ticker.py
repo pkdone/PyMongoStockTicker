@@ -23,7 +23,7 @@
 #
 # Prerequisites:
 #
-# 1) Configure and run one of following using MongoDB version 3.6+:
+# 1) Configure and run one of following using MongoDB (version 3.6+):
 # * MongoDB Replica Set (e.g. https://github.com/pkdone/mongo-quick-repset)
 #  or
 # * Sharded Cluster (e.g. https://github.com/pkdone/mongo-multi-svr-generator)
@@ -31,8 +31,8 @@
 # 2) Install PyMongo driver (version 3.6+), eg:
 #   $ sudo pip install pymongo
 #
-# 3) Change the value of the MONGODB_URL variable, below, to reflect cluster
-#    address
+# 3) Change the value of the MONGODB_URL variable, below, to reflect the
+#    cluster's address
 ##
 import os
 import sys
@@ -205,11 +205,13 @@ def show_console_ui(stdscr):
         last_updated_tracker[symbol] = now
 
     for symbol in symbols_list:
+        # Symbol postn: 0, Colon postn: 6, Price postn: 8
         stdscr.addstr(symbols_list.index(symbol), 0, symbol)
         stdscr.addstr(symbols_list.index(symbol), 6, ':')
         stdscr.addstr(symbols_list.index(symbol), 8,
                       str(last_price_tracker[symbol]))
 
+    # Position Ctrl-C text on line below last symbol
     stdscr.addstr(len(symbols_list)+1, 0, '(press "Ctrl-C" to quit)')
     refresh_console_ui(stdscr, len(symbols_list)+2)
     cursor = stocks_coll().watch(get_stock_watch_filter(),
@@ -223,6 +225,7 @@ def show_console_ui(stdscr):
         last_price_tracker[changed_symbol] = price
 
         for symbol in symbols_list:
+            # Recently changed symbol prices show highlighted
             if (now - last_updated_tracker[symbol]).total_seconds() < 1:
                 stdscr.addstr(symbols_list.index(symbol), 8,
                               str(last_price_tracker[symbol]),
@@ -281,10 +284,10 @@ def stocks_coll():
 ####
 # If the target cluster is sharded, shard the database.collection on just the
 # '_id' field (not usually recommended but for demos this is fine). Also, pre-
-# split the collection's chunks to ensure added records are spread accross both
-# shards from day 1, to avoid Changes Streams issues with sharded clusters
-# w.r.t.: (i) no resume token errors, and (ii) gaps of 10 second between sets
-# of change events.
+# split the collection's chunks to ensure added records are spread across all
+# shards from day one, to avoid Changes Streams issues with sharded clusters
+# w.r.t.: (i) 'no resume token' errors, and (ii) gaps of 10 seconds between
+# sets of change events.
 ####
 def enable_collection_sharding_if_required():
     admin_db = mongo_client.admin
@@ -294,7 +297,7 @@ def enable_collection_sharding_if_required():
         admin_db.command('shardCollection', '%s.%s' % (DB, COLL),
                          key={'_id': 1})
 
-        # Create temp docs from A-Z to help with subsequent splitting chunks
+        # Create temp docs from A-Z to help with subsequent split of chunks
         for c in ascii_uppercase:
             stocks_coll().insert({'_id': '%s%s%s%s%s' % (c, c, c, c, c),
                                   'price': 0})
@@ -305,20 +308,20 @@ def enable_collection_sharding_if_required():
             admin_db.command({'split': '%s.%s' % (DB, COLL),
                               'find': {'_id': '%s' % c}})
 
-        # Wait 15 seconds to allow the balancer to split chunks accross shards
+        # Wait 15 seconds to allow the balancer to move chunks across shards
         for i in xrange(0, 30):
                 sys.stdout.write('.')
                 sys.stdout.flush()
                 time.sleep(0.5)
 
-        # Remove tem docs from A-Z as now longer needed
+        # Remove temp docs from A-Z as no longer needed
         for c in ascii_uppercase:
             stocks_coll().remove({'_id': '%s%s%s%s%s' % (c, c, c, c, c)})
 
 
 ####
 # Return the aggregation filter to be used to watch important stock symbol
-# price changes
+# price changes only
 ####
 def get_stock_watch_filter():
     return [
